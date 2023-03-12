@@ -46,7 +46,11 @@ func (client *Client) sendMsg() {
 }
 
 func main() {
-	url := "ws://localhost:8080/ws"
+	var name string
+	fmt.Println("请输入你的用户名")
+	_, _ = fmt.Scanf("%d", &name)
+	host := "ws://localhost:8080/ws?name=%v"
+	url := fmt.Sprintf(host, name)
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		log.Println(err)

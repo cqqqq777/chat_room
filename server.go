@@ -10,11 +10,11 @@ import (
 )
 
 type ClientPool struct {
-	users map[*client]bool //在线则设置为true，离线删除
+	users map[*Client]bool //在线则设置为true，离线删除
 	Mutex sync.RWMutex
 }
 
-type client struct {
+type Client struct {
 	conn *websocket.Conn
 	name string
 }
@@ -24,29 +24,32 @@ var upgrader = websocket.HertzUpgrader{CheckOrigin: func(_ *app.RequestContext) 
 }}
 
 var (
-	joinChan  = make(chan []byte)
-	msgChan   = make(chan []byte, 1024)
-	leaveChan = make(chan []byte)
+	joinChan  = make(chan []byte)       //登入管道
+	msgChan   = make(chan []byte, 1024) //消息管道
+	leaveChan = make(chan []byte)       //登出管道
 )
 
 var clientPool = ClientPool{
-	users: make(map[*client]bool),
+	users: make(map[*Client]bool),
 	Mutex: sync.RWMutex{},
 }
 
 func ServeWs(c *app.RequestContext) {
+	//升级websocket
 	err := upgrader.Upgrade(c, func(conn *websocket.Conn) {
 		name, ok := c.Get("name")
 		if !ok {
 			log.Println("no username")
 			return
 		}
-		var client = &client{
+		//创建client实例
+		var client = &Client{
 			conn: conn,
 			name: name.(string),
 		}
 		clientPool.join(client)
-
+		//启动协程来读取用户发送的消息
+		go client.readMsg()
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, "connect failed")
@@ -55,14 +58,14 @@ func ServeWs(c *app.RequestContext) {
 	}
 }
 
-func (c *ClientPool) join(client *client) {
+func (c *ClientPool) join(client *Client) {
 	c.Mutex.Lock()
 	defer c.Mutex.Unlock()
 	c.users[client] = true
 	joinChan <- []byte("user:" + client.name + "join")
 }
 
-func (c *ClientPool) leave(client *client) {
+func (c *ClientPool) leave(client *Client) {
 	c.Mutex.Lock()
 	defer c.Mutex.Unlock()
 	delete(c.users, client)
@@ -71,6 +74,8 @@ func (c *ClientPool) leave(client *client) {
 
 func ListenAndServe() {
 	for {
+		//监控用户的登入登出与发消息
+		//获取到消息后遍历用户组，将消息分别发给他们
 		select {
 		case join := <-joinChan:
 			for k, _ := range clientPool.users {
@@ -97,7 +102,8 @@ func ListenAndServe() {
 	}
 }
 
-func (c *client) readMsg() {
+func (c *Client) readMsg() {
+	//读用户发来的消息
 	for {
 		_, data, err := c.conn.ReadMessage()
 		if err != nil {

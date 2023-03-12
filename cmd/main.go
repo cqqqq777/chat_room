@@ -18,7 +18,7 @@ func main() {
 		o.Addr = *addr
 	}})
 	h.GET("/ws", func(_ context.Context, c *app.RequestContext) {
-		c.Set("name", c.Param("name"))
+		c.Set("name", c.Query("name"))
 		services.ServeWs(c)
 	})
 	h.Spin()
