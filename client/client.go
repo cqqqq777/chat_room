@@ -37,7 +37,7 @@ func (client *Client) sendMsg() {
 			log.Println("send message failed err:", err)
 			continue
 		}
-		err = client.conn.WriteMessage(1, bytes[:len(bytes)-1])
+		err = client.conn.WriteMessage(websocket.TextMessage, bytes[:len(bytes)-1])
 		if err != nil {
 			log.Println("send message failed err:", err)
 			continue
@@ -48,7 +48,7 @@ func (client *Client) sendMsg() {
 func main() {
 	var name string
 	fmt.Println("请输入你的用户名")
-	_, _ = fmt.Scanf("%d", &name)
+	_, _ = fmt.Scanf("%s", &name)
 	host := "ws://localhost:8080/ws?name=%v"
 	url := fmt.Sprintf(host, name)
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)

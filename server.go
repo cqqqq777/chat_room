@@ -50,26 +50,28 @@ func ServeWs(c *app.RequestContext) {
 		clientPool.join(client)
 		//启动协程来读取用户发送的消息
 		go client.readMsg()
+		select {}
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, "connect failed")
 		log.Println(err)
 		return
 	}
+
 }
 
 func (c *ClientPool) join(client *Client) {
 	c.Mutex.Lock()
 	defer c.Mutex.Unlock()
 	c.users[client] = true
-	joinChan <- []byte("user:" + client.name + "join")
+	joinChan <- []byte("user:" + client.name + "  join")
 }
 
 func (c *ClientPool) leave(client *Client) {
 	c.Mutex.Lock()
 	defer c.Mutex.Unlock()
 	delete(c.users, client)
-	leaveChan <- []byte("user:" + client.name + "leave")
+	leaveChan <- []byte("user:" + client.name + "  leave")
 }
 
 func ListenAndServe() {
@@ -79,21 +81,21 @@ func ListenAndServe() {
 		select {
 		case join := <-joinChan:
 			for k, _ := range clientPool.users {
-				err := k.conn.WriteMessage(1, join)
+				err := k.conn.WriteMessage(websocket.TextMessage, join)
 				if err != nil {
 					log.Println(err)
 				}
 			}
 		case msg := <-msgChan:
 			for k, _ := range clientPool.users {
-				err := k.conn.WriteMessage(1, msg)
+				err := k.conn.WriteMessage(websocket.TextMessage, msg)
 				if err != nil {
 					log.Println(err)
 				}
 			}
 		case leave := <-leaveChan:
 			for k, _ := range clientPool.users {
-				err := k.conn.WriteMessage(1, leave)
+				err := k.conn.WriteMessage(websocket.CloseMessage, leave)
 				if err != nil {
 					log.Println(err)
 				}
@@ -110,6 +112,8 @@ func (c *Client) readMsg() {
 			log.Println(err)
 			continue
 		}
+		nameBytes := []byte("      -----" + c.name)
+		data = append(data, nameBytes...)
 		msgChan <- data
 	}
 }
